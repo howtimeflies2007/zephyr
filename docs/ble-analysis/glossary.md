@@ -24,7 +24,7 @@ Terms are in alphabetical order. Format: **TERM** — one-sentence definition (p
 
 **LL** — Link Layer, the controller-side state machine that manages the LE air interface (advertising, scanning, connections, control procedures). _Source:_ `[Core 6.0, Vol 6, Part B]` (verify §); in-tree LL at `subsys/bluetooth/controller/ll_sw/`.
 
-**LLL** — Lower Link Layer, the vendor, radio-ISR-context half of Zephyr's split Link Layer that owns the air interface. _Source:_ `doc/connectivity/bluetooth/bluetooth-ctlr-arch.rst:136`; code under `subsys/bluetooth/controller/ll_sw/lll/`.
+**LLL** — Lower Link Layer, the vendor, radio-ISR-context half of Zephyr's split Link Layer that owns the air interface. _Source:_ `doc/connectivity/bluetooth/bluetooth-ctlr-arch.rst:65` (§ "Upper Link Layer and Lower Link Layer"), most concrete textual line at `:136`; code under `subsys/bluetooth/controller/ll_sw/lll/`.
 
 **LTK** — Long Term Key, the SMP-derived key used to encrypt an LE link and re-establish encryption on later reconnections. _Source:_ `[Core 6.0, Vol 3, Part H (Security Manager)]` (verify §); host key storage `subsys/bluetooth/host/keys.c`.
 
@@ -34,7 +34,7 @@ Terms are in alphabetical order. Format: **TERM** — one-sentence definition (p
 
 **MTU** — Maximum Transmission Unit, the largest SDU the L2CAP upper layer is able to accept. _Source:_ `doc/connectivity/bluetooth/bluetooth-le-host.rst:189`; `[Core 6.0, Vol 3, Part A]`.
 
-**net_buf** — Zephyr's reference-counted network buffer object used throughout the BLE stack for pooled packet management without hot-path allocation. _Source:_ `include/zephyr/net_buf.h:24` (`@defgroup net_buf Network Buffer Library`).
+**net_buf** — Zephyr's reference-counted network buffer object used throughout the BLE stack for pooled packet management without hot-path allocation. _Source:_ `include/zephyr/net_buf.h:25` (`@defgroup net_buf Network Buffer Library`).
 
 **PDU** — Protocol Data Unit, a packet of L2CAP data that begins with the Basic L2CAP header (length + CID). _Source:_ `doc/connectivity/bluetooth/bluetooth-le-host.rst:180`; `[Core 6.0, Vol 3, Part A]`.
 
@@ -42,13 +42,13 @@ Terms are in alphabetical order. Format: **TERM** — one-sentence definition (p
 
 **SDU** — Service Data Unit, a packet of data L2CAP exchanges with the upper layer. _Source:_ `doc/connectivity/bluetooth/bluetooth-le-host.rst:174`; `[Core 6.0, Vol 3, Part A]`.
 
-**ULL** — Upper Link Layer, the generic, mayfly/thread-context half of Zephyr's split Link Layer that owns scheduling and control-procedure handling. _Source:_ `doc/connectivity/bluetooth/bluetooth-ctlr-arch.rst:136`; code `subsys/bluetooth/controller/ll_sw/ull_*.c`.
+**ULL** — Upper Link Layer, the generic, mayfly/thread-context half of Zephyr's split Link Layer that owns scheduling and control-procedure handling. _Source:_ `doc/connectivity/bluetooth/bluetooth-ctlr-arch.rst:65` (§ "Upper Link Layer and Lower Link Layer"), most concrete textual line at `:136`; code `subsys/bluetooth/controller/ll_sw/ull_*.c`.
 
 ---
 
 ## Open questions
 
 - Several spec citations are marked **(verify §)** because exact section numbers were not confirmed at this SHA: ACL (Vol 6 Part B framing), ATT/ATT MTU (Vol 3 Part F), GATT (Vol 3 Part G), IRK/LTK (Vol 3 Part H), LL (Vol 6 Part B), RPA (Vol 6 Part B / Vol 3 Part C). The host doc's L2CAP terminology table is sourced from Core Spec v5.4 (Vol 3, Part A, §1.4); Core 6.0 section numbering should be re-validated.
-- For **LLL/ULL**, the controller arch `.rst` describes the split mostly via images; the most concrete textual line is `bluetooth-ctlr-arch.rst:136`. A finer definition would require citing the code split (`ll_sw/lll/` vs `ll_sw/ull_*.c`), already noted in each entry.
+- For **LLL/ULL**, the controller arch `.rst` describes the split mostly via images; the canonical section is `bluetooth-ctlr-arch.rst:65` ("Upper Link Layer and Lower Link Layer", image-driven) and the most concrete textual line is `:136`. A finer definition relies on the code split (`ll_sw/lll/` vs `ll_sw/ull_*.c`), already cited in each entry.
 - **RPA** has two plausible source locations (LL address types in Vol 6 Part B vs. privacy in Vol 3 Part C); both are listed pending a definitive pick.
 - **Spec version baseline**: Terms in this glossary follow Bluetooth Core Spec v5.4 wording (as Zephyr's own documentation uses). Procedure-level citations in Phase 1+ artifacts will use Core 6.x section numbers. Cross-version terminology drift is small; Part letters and section numbers will be spot-verified ad-hoc when first cited in later phases.
