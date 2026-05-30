@@ -82,30 +82,30 @@ User preferences for path location override this default.
 **Goal:** Establish a single source of truth that all later phases reference.
 
 ### Task 0.1 — Pin revision and toolchain
-- [ ] Run `git -C zephyr rev-parse HEAD` → record SHA, tag (if any), `west list -f '{name} {revision}'` output
-- [ ] Record host toolchain: `zephyr-sdk --version`, `west --version`, `cmake --version`
-- [ ] Deliverable: header block at top of `docs/ble-analysis/00-orientation.md`
-- [ ] Verification: SHA is present and `git cat-file -e <SHA>` succeeds
+- [x] Run `git -C zephyr rev-parse HEAD` → record SHA, tag (if any), `west list -f '{name} {revision}'` output
+- [x] Record host toolchain: `zephyr-sdk --version`, `west --version`, `cmake --version`
+- [x] Deliverable: header block at top of `docs/ble-analysis/00-orientation.md`
+- [x] Verification: SHA is present and `git cat-file -e <SHA>` succeeds
 - **Dependencies:** none
 
 ### Task 0.2 — Build-mode enumeration
-- [ ] Read `doc/connectivity/bluetooth/bluetooth-arch.rst`
-- [ ] Identify the three build modes (combined / host-only / controller-only) and the Kconfig minimum set that defines each
-- [ ] For each mode, find one sample under `samples/bluetooth/` that exemplifies it; list its `prj.conf` deltas vs. defaults
-- [ ] Deliverable: `## Build modes` section in `00-orientation.md` with a table
-- [ ] Verification: each row of the table has (a) Kconfig set, (b) one sample path, (c) which Zephyr halves are present
+- [x] Read `doc/connectivity/bluetooth/bluetooth-arch.rst`
+- [x] Identify the three build modes (combined / host-only / controller-only) and the Kconfig minimum set that defines each
+- [x] For each mode, find one sample under `samples/bluetooth/` that exemplifies it; list its `prj.conf` deltas vs. defaults
+- [x] Deliverable: `## Build modes` section in `00-orientation.md` with a table
+- [x] Verification: each row of the table has (a) Kconfig set, (b) one sample path, (c) which Zephyr halves are present
 - **Dependencies:** 0.1
 
 ### Task 0.3 — Reference index
-- [ ] Catalogue authoritative references: every `.rst` under `doc/connectivity/bluetooth/`, plus relevant Core Spec volumes
-- [ ] Deliverable: `## References` section in `00-orientation.md`
-- [ ] Verification: every `.rst` under `doc/connectivity/bluetooth/` (excluding `_includes/`) is either listed or explicitly noted as out of scope
+- [x] Catalogue authoritative references: every `.rst` under `doc/connectivity/bluetooth/`, plus relevant Core Spec volumes
+- [x] Deliverable: `## References` section in `00-orientation.md`
+- [x] Verification: every `.rst` under `doc/connectivity/bluetooth/` (excluding `_includes/`) is either listed or explicitly noted as out of scope
 - **Dependencies:** 0.1
 
 ### Task 0.4 — Seed glossary
-- [ ] Extract glossary terms from `doc/connectivity/bluetooth/bluetooth-le-host.rst` (it already has a glossary section)
-- [ ] Deliverable: `docs/ble-analysis/glossary.md` with at least: ACL, ATT, ATT MTU, GATT, L2CAP, MPS, MTU, PDU, SDU, HCI, LL, LLL, ULL, mayfly, net_buf, RPA, IRK, LTK
-- [ ] Verification: each term has a 1-sentence definition + source citation (spec section or file path)
+- [x] Extract glossary terms from `doc/connectivity/bluetooth/bluetooth-le-host.rst` (it already has a glossary section)
+- [x] Deliverable: `docs/ble-analysis/glossary.md` with at least: ACL, ATT, ATT MTU, GATT, L2CAP, MPS, MTU, PDU, SDU, HCI, LL, LLL, ULL, mayfly, net_buf, RPA, IRK, LTK
+- [x] Verification: each term has a 1-sentence definition + source citation (spec section or file path)
 - **Dependencies:** 0.3
 
 ### 🔍 Review checkpoint after Phase 0
