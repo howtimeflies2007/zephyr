@@ -118,10 +118,10 @@ Human review of `00-orientation.md` before proceeding. If the build-mode table i
 **Goal:** Map the single most important architectural seam. After this phase, any "how does X get from app to air?" question has a clear handoff point.
 
 ### Task 1.1 — HCI command/event taxonomy
-- [ ] Read `include/zephyr/bluetooth/hci_types.h`
-- [ ] Produce a categorized list of command groups (Link Control, LE Controller, Vendor) and event types; cite OpCode Group Field values
-- [ ] Deliverable: `phase-1-hci/boundary.md` § "HCI surface"
-- [ ] Verification: at least 5 LE Controller commands and 5 LE events are listed with file:line + spec section
+- [x] Read `include/zephyr/bluetooth/hci_types.h`
+- [x] Produce a categorized list of command groups (Link Control, LE Controller, Vendor) and event types; cite OpCode Group Field values
+- [x] Deliverable: `phase-1-hci/boundary.md` § "HCI surface"
+- [x] Verification: at least 5 LE Controller commands and 5 LE events are listed with file:line + spec section
 - **Dependencies:** 0.4
 
 ### Task 1.2 — Host-side dispatch (commands out, events in)
