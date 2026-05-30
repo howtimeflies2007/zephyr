@@ -127,3 +127,5 @@ ZephyrModuleFile.txt
 
 # Node dependecies
 node_modules
+# Claude Code personal overrides
+.claude/settings.local.json

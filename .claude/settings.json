@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "_comment_purpose": "Project-level settings for Zephyr BLE analysis. Committed to git. Personal overrides go in .claude/settings.local.json (gitignored).",
+
+  "permissions": {
+    "_comment_allow": "Whitelisted shell commands — Claude Code will run these without per-call confirmation. Patterns use a wildcard model: 'Bash(rg:*)' means 'any Bash invocation that starts with rg'.",
+
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git cat-file:*)",
+      "Bash(git branch:*)",
+      "Bash(git describe:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git blame:*)",
+      "Bash(git tag:*)",
+      "Bash(git add docs/ble-analysis/:*)",
+      "Bash(git add CLAUDE.md)",
+      "Bash(git add .claude/:*)",
+      "Bash(git commit -m:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash(realpath:*)",
+      "Bash(west list:*)",
+      "Bash(west manifest:*)",
+      "Bash(mmdc -i:*)",
+      "Bash(mkdir -p docs/ble-analysis/:*)"
+    ],
+
+    "_comment_deny": "Hard blocks — even if 'allow' would match, deny wins. Protects source code from accidental edits and prevents pushes to upstream.",
+
+    "deny": [
+      "Edit(subsys/bluetooth/**/*.c)",
+      "Edit(subsys/bluetooth/**/*.h)",
+      "Edit(subsys/bluetooth/**/Kconfig*)",
+      "Edit(subsys/bluetooth/**/CMakeLists.txt)",
+      "Edit(drivers/bluetooth/**/*.c)",
+      "Edit(drivers/bluetooth/**/*.h)",
+      "Edit(drivers/bluetooth/**/Kconfig*)",
+      "Edit(include/zephyr/bluetooth/**/*.h)",
+      "Edit(doc/connectivity/bluetooth/**)",
+      "Write(subsys/bluetooth/**)",
+      "Write(drivers/bluetooth/**)",
+      "Write(include/zephyr/bluetooth/**)",
+      "Write(doc/connectivity/bluetooth/**)",
+
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(git checkout -- subsys/:*)",
+      "Bash(git checkout -- drivers/:*)",
+      "Bash(git checkout -- include/:*)",
+      "Bash(git rebase:*)",
+      "Bash(git merge:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git remote remove:*)",
+
+      "Bash(rm -rf:*)",
+      "Bash(rm -r:*)",
+      "Bash(rm -f:*)",
+      "Bash(mv subsys/:*)",
+      "Bash(mv drivers/:*)",
+      "Bash(mv include/:*)",
+
+      "Bash(west update:*)",
+      "Bash(west init:*)",
+
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(npm install:*)",
+      "Bash(pip install:*)",
+      "Bash(apt:*)",
+      "Bash(sudo:*)"
+    ],
+
+    "_comment_ask": "Confirm before running — useful for actions that are usually OK but occasionally need a second look.",
+
+    "ask": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(mmdc:*)"
+    ]
+  },
+
+  "_comment_env": "Environment variables visible to commands Claude runs. Keep this short and non-secret.",
+
+  "env": {
+    "BLE_ANALYSIS_SCOPE": "phase-1",
+    "BLE_ANALYSIS_BUILD_MODE": "combined",
+    "BLE_ANALYSIS_OUTPUT_DIR": "docs/ble-analysis"
+  },
+
+  "_comment_hooks": "Hook scripts run at lifecycle events. Each is a shell command Claude Code invokes; non-zero exit blocks the action.",
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-upstream-push.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-readonly-violation.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/inject-context.sh"
+          }
+        ]
+      }
+    ]
+  },
+
+  "_comment_status_line": "Optional: shows pinned analysis SHA in the status line so you don't lose track of it across sessions.",
+
+  "statusLine": {
+    "type": "command",
+    "command": "test -f docs/ble-analysis/00-orientation.md && grep -m1 '^Revision:' docs/ble-analysis/00-orientation.md | head -c 80 || echo 'No pinned SHA yet'"
+  }
+}
