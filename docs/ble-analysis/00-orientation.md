@@ -56,8 +56,40 @@ node, not by Kconfig:
 | Mode | DTS chosen → compatible | Min Kconfig | Example sample | Halves |
 |---|---|---|---|---|
 | **Combined** | `zephyr,bt-hci-ll-sw-split` (or vendor LL, e.g. Espressif's `espressif,esp32-bt-hci`) | `CONFIG_BT=y` | `samples/bluetooth/peripheral` | host + controller |
-| **Host-only** | `zephyr,bt-hci-uart` / `-spi` / `-ipc` (e.g. nRF5340 app core) / `-userchan` | `CONFIG_BT=y` | nRF5340 app-core variants; boards with external chip | host only |
+| **Host-only** | external-transport HCI node: `zephyr,bt-hci-ipc` / `-uart` / `-spi` / `-userchan` | `CONFIG_BT=y` (+ DT-selected transport, e.g. `CONFIG_BT_HCI_IPC` / `CONFIG_BT_USERCHAN`) | `samples/bluetooth/peripheral` on `nrf5340dk/nrf5340/cpuapp` (DTS: `boards/nordic/nrf5340dk/nrf5340_cpuapp_common.dtsi:17`); sim: `native_sim` (`boards/native/native_sim/native_sim.dts:27`) | host only |
 | **Controller-only** | local LL compatible, plus `CONFIG_BT_HCI_RAW=y` for the wrapper | `CONFIG_BT=y, CONFIG_BT_HCI_RAW=y` | `samples/bluetooth/hci_uart`, `hci_ipc` | controller only |
+
+### Host-only exemplar (DTS-determined, not prj.conf)
+
+There is no `samples/bluetooth/*` whose `prj.conf` *by itself* forces
+Host-only — the discriminator is the `zephyr,bt-hci` chosen node in the
+board DTS, not Kconfig (see Open questions 3 and 4). A host-role app
+becomes Host-only purely by being built for a board whose chosen
+`zephyr,bt-hci` node resolves to an **external-transport** HCI driver
+rather than a local LL. Two concrete, in-tree exemplars at the pinned
+SHA:
+
+- **Hardware — nRF5340 DK app core.** Build e.g.
+  `samples/bluetooth/peripheral` for `nrf5340dk/nrf5340/cpuapp`. Its
+  DTS chooses `zephyr,bt-hci = &bt_hci_ipc0`
+  (`boards/nordic/nrf5340dk/nrf5340_cpuapp_common.dtsi:17`); the node is
+  defined with `compatible = "zephyr,bt-hci-ipc"`
+  (`dts/arm/nordic/nrf5340_cpuapp_ipc.dtsi:15-18`), which binds the IPC
+  transport driver `CONFIG_BT_HCI_IPC`
+  (`drivers/bluetooth/hci/Kconfig:32`). The controller runs on the net
+  core (`hci_ipc` sample). App core = host only.
+- **Simulation — `native_sim` + user channel.** The board DTS chooses
+  `zephyr,bt-hci = &bt_hci_userchan`
+  (`boards/native/native_sim/native_sim.dts:27`), node
+  `compatible = "zephyr,bt-hci-userchan"`
+  (`boards/native/native_sim/native_sim.dts:241-242`), binding
+  `CONFIG_BT_USERCHAN` (`drivers/bluetooth/hci/Kconfig:154-158`, gated on
+  `BOARD_NATIVE_SIM` + `DT_HAS_ZEPHYR_BT_HCI_USERCHAN_ENABLED`). The
+  controller lives outside the image (e.g. BlueZ over a HCI user
+  channel). Host only.
+
+In both cases the same app `prj.conf` (`CONFIG_BT=y`, no controller
+Kconfig) is shared with a Combined build; only the board DTS differs.
 
 ### Why no `CONFIG_BT_CTLR=y` row
 
@@ -273,7 +305,7 @@ Canonical entry files for the two halves of the stack and their HCI seam (paths 
 
 3. **No prj.conf-only Host-only exemplar**: Per `doc/connectivity/bluetooth/bluetooth-arch.rst:115-142`, Host-only and Combined share an identical Kconfig set (`CONFIG_BT=y` → `CONFIG_BT_HCI=y`) and are separated purely by devicetree (which `zephyr,bt-hci` node is chosen, and whether the local LL node is disabled). No `samples/bluetooth/*` directory has a `prj.conf` that *by itself* forces Host-only; the chosen exemplar (`samples/bluetooth/peripheral/` on `native_sim`, relying on `CONFIG_BT_USERCHAN`) depends on board-level DT and a `BOARD_NATIVE_SIM` gate (`drivers/bluetooth/hci/Kconfig:154-158`). To assert Host-only definitively, a board/DTS overlay (or the generated `.config` + devicetree) at build time must be inspected — not build-verified in this environment (see open question 2).
 
-   **Status: RESOLVED (by Q4's finding).** The premise of needing a "prj.conf-only Host-only exemplar" assumes Kconfig is the discriminator. Q4 establishes that the discriminator is the DTS `zephyr,bt-hci` chosen node, not prj.conf. Host-only is correctly identified by board DTS + overlay (no prj.conf-only exemplar should exist or be sought). See `subsys/bluetooth/CLAUDE.md` § "Build mode detection (analysis rule)".
+   **Status: RESOLVED (by Q4's finding).** The premise of needing a "prj.conf-only Host-only exemplar" assumes Kconfig is the discriminator. Q4 establishes that the discriminator is the DTS `zephyr,bt-hci` chosen node, not prj.conf. Host-only is correctly identified by board DTS + overlay (no prj.conf-only exemplar should exist or be sought). The Build-modes table's Host-only row now cites two concrete DTS-determined exemplars (nRF5340 DK app core; `native_sim` + user channel) — see § "Host-only exemplar (DTS-determined, not prj.conf)" above and `subsys/bluetooth/CLAUDE.md` § "Build mode detection (analysis rule)".
 
 4. **Combined vs Host-only requires DT inspection, not just Kconfig**: Because `HAS_BT_CTLR` is selected transitively through `CONFIG_BT_LL_SW_SPLIT`, which is `default y` only under `DT_HAS_ZEPHYR_BT_HCI_LL_SW_SPLIT_ENABLED` (`subsys/bluetooth/controller/Kconfig:143-147`), determining whether a given build is Combined or Host-only cannot be done from `prj.conf` alone; it needs the board's devicetree (whether the local LL node is `okay`). Any per-board mode classification in later tasks must read the resolved devicetree, not just Kconfig.
 
