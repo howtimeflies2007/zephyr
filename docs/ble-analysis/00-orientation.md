@@ -50,21 +50,33 @@ The absence of the Zephyr SDK means no on-host compilation is possible in this e
 
 ## Build modes
 
-Zephyr's BLE stack is split into a **Host** (above HCI) and a **Controller** (the Link Layer, below HCI), with the standardized HCI protocol as the seam between them (`doc/connectivity/bluetooth/bluetooth-arch.rst:25-37`, `doc/connectivity/bluetooth/bluetooth-arch.rst:43-51`). Because the two halves talk over a defined interface, they can be built into one image or into two separate images on different chips (`doc/connectivity/bluetooth/bluetooth-arch.rst:58-82`). The arch doc enumerates three Bluetooth build types — Controller-only, Host-only, and Combined (`doc/connectivity/bluetooth/bluetooth-arch.rst:84-142`). A key subtlety: per the doc, **Host-only and Combined share the same Kconfig set** (`CONFIG_BT=y`, `CONFIG_BT_HCI=y`); they are distinguished by *devicetree* — which `zephyr,bt-hci` node is chosen — not by Kconfig (`doc/connectivity/bluetooth/bluetooth-arch.rst:115-142`).
+Three modes, distinguished by the application's `zephyr,bt-hci` chosen
+node, not by Kconfig:
 
-| Mode | Defining Kconfig (minimum set) | Halves present (Host / Controller) | Exemplar sample (path) | Key prj.conf deltas (file:line) |
-|------|--------------------------------|-------------------------------------|------------------------|----------------------------------|
-| **Combined** | `CONFIG_BT=y` (→ implies `CONFIG_BT_HCI=y`); in-tree controller pulled in via `CONFIG_BT_LL_SW_SPLIT` (which `select`s `HAS_BT_CTLR`), gated on the LL devicetree node | Host **and** Controller (same image) | `samples/bluetooth/peripheral/` | `CONFIG_BT=y` (`samples/bluetooth/peripheral/prj.conf:4`); host features e.g. `CONFIG_BT_PERIPHERAL=y` (`:7`), `CONFIG_BT_SMP=y` (`:6`). No `CONFIG_BT_HCI_RAW` and no transport-driver config → controller is local. |
-| **Host-only** | `CONFIG_BT=y` (→ `CONFIG_BT_HCI=y`), **same as Combined**; differs by DT: an external-controller HCI transport node is chosen and the local LL node is disabled (so `HAS_BT_CTLR` is *not* selected) | Host only (external controller chip) | `samples/bluetooth/peripheral/` built for `native_sim` (uses `CONFIG_BT_USERCHAN`) | Same app deltas as Combined (`samples/bluetooth/peripheral/prj.conf:4`); the host-only-ness comes from `CONFIG_BT_USERCHAN=y`, which is `BOARD_NATIVE_SIM`-gated and DT-driven (`drivers/bluetooth/hci/Kconfig:154-158`), not from prj.conf. |
-| **Controller-only** | `CONFIG_BT=y`, `CONFIG_BT_HCI=y`, `CONFIG_BT_HCI_RAW=y` (+ in-tree controller via the LL DT node) | Controller only (host runs elsewhere, e.g. Linux BlueZ) | `samples/bluetooth/hci_uart/` | `CONFIG_BT=y` (`samples/bluetooth/hci_uart/prj.conf:10`), `CONFIG_BT_HCI_RAW=y` (`:11`), `CONFIG_BT_HCI_RAW_H4=y` (`:12`), `CONFIG_BT_HCI_RAW_H4_ENABLE=y` (`:13`) |
+| Mode | DTS chosen → compatible | Min Kconfig | Example sample | Halves |
+|---|---|---|---|---|
+| **Combined** | `zephyr,bt-hci-ll-sw-split` (or vendor LL, e.g. Espressif's `espressif,esp32-bt-hci`) | `CONFIG_BT=y` | `samples/bluetooth/peripheral` | host + controller |
+| **Host-only** | `zephyr,bt-hci-uart` / `-spi` / `-ipc` (e.g. nRF5340 app core) / `-userchan` | `CONFIG_BT=y` | nRF5340 app-core variants; boards with external chip | host only |
+| **Controller-only** | local LL compatible, plus `CONFIG_BT_HCI_RAW=y` for the wrapper | `CONFIG_BT=y, CONFIG_BT_HCI_RAW=y` | `samples/bluetooth/hci_uart`, `hci_ipc` | controller only |
 
-**Combined.** The master gate is `CONFIG_BT` (`subsys/bluetooth/Kconfig:7`). Enabling it activates the `BT_STACK_SELECTION` choice whose `default` is `BT_HCI` (`subsys/bluetooth/Kconfig:18-24`), so `CONFIG_BT=y` implies `CONFIG_BT_HCI=y` without an explicit line — which is why the peripheral sample lists only `CONFIG_BT=y` (`samples/bluetooth/peripheral/prj.conf:4`). The in-tree software controller is pulled in by `CONFIG_BT_LL_SW_SPLIT` (`subsys/bluetooth/controller/Kconfig:143`), which `select`s the virtual `HAS_BT_CTLR` flag (`subsys/bluetooth/controller/Kconfig:140`, selected at `:147`) and defaults `y` only when the LL devicetree node is enabled (`depends on DT_HAS_ZEPHYR_BT_HCI_LL_SW_SPLIT_ENABLED`, `subsys/bluetooth/controller/Kconfig:146`). Thus "combined" is the natural result of a generic BLE app on a board whose DTS enables the local LL controller.
+### Why no `CONFIG_BT_CTLR=y` row
 
-**Host-only.** Kconfig-wise this is *indistinguishable* from Combined (`CONFIG_BT=y` → `CONFIG_BT_HCI=y`); the arch doc is explicit that the difference is devicetree — the local controller's DT node is disabled and a transport driver's `zephyr,bt-hci` node is chosen instead (`doc/connectivity/bluetooth/bluetooth-arch.rst:115-126`). Because the local LL node is then absent, `CONFIG_BT_LL_SW_SPLIT` does not default on and `HAS_BT_CTLR` is not selected, so `controller/` is not built. A concrete single-sample exemplar is the ordinary `samples/bluetooth/peripheral/` app built for `native_sim`, where `CONFIG_BT_USERCHAN=y` (`drivers/bluetooth/hci/Kconfig:154`) provides an external-controller HCI transport to the Linux host's adapter (`drivers/bluetooth/hci/Kconfig:158-165`); the same prj.conf serves both Combined and Host-only, matching the doc's statement that every non-controller-only sample can be built either way (`doc/connectivity/bluetooth/bluetooth-arch.rst:128-129`).
+Verified at pinned SHA: there is **no** Kconfig symbol named `BT_CTLR`
+in the tree (only the namespace `BT_CTLR_*` for controller features).
+Controller inclusion goes through:
 
-**Controller-only.** This is the one mode with a distinguishing Kconfig symbol: `CONFIG_BT_HCI_RAW` (`subsys/bluetooth/Kconfig:45`), which exposes the controller to a bridge application over a raw HCI transport (`doc/connectivity/bluetooth/bluetooth-arch.rst:95-113`). The `hci_uart` sample enables it together with the H:4 transport variants `CONFIG_BT_HCI_RAW_H4` (`subsys/bluetooth/Kconfig:51`) and `CONFIG_BT_HCI_RAW_H4_ENABLE` (`subsys/bluetooth/Kconfig:57`, which depends on `BT_HCI_RAW_H4`), seen at `samples/bluetooth/hci_uart/prj.conf:11-13`. The Host is not built; the in-tree controller still needs its DT node enabled to be present (`doc/connectivity/bluetooth/bluetooth-arch.rst:112-113`), and the external host (Zephyr or BlueZ) speaks HCI over the wire.
+    DTS chosen → DT_HAS_ZEPHYR_BT_HCI_LL_SW_SPLIT_ENABLED
+              → BT_LL_SW_SPLIT=y  (subsys/bluetooth/controller/Kconfig:143)
+              → HAS_BT_CTLR=y     (subsys/bluetooth/controller/Kconfig:140)
+              → controller/ tree compiled
 
----
+When this analysis says "combined build", it means an application
+whose effective DTS resolves the `zephyr,bt-hci` chosen node to a
+local LL compatible (`zephyr,bt-hci-ll-sw-split` is the canonical
+example).
+
+See `subsys/bluetooth/CLAUDE.md` § "Controller enablement chain" and
+§ "Build mode detection (analysis rule)" for the full chain.
 
 ## References
 
@@ -249,16 +261,28 @@ Canonical entry files for the two halves of the stack and their HCI seam (paths 
 
 ---
 
-## Open questions
+## Open questions (triaged)
 
 1. **No west workspace**: `west list` failed because the repo was not checked out via `west init`. Later tasks that need to know which Zephyr module versions (hal_nordic, mbedtls, trusted-firmware-m, etc.) are paired with this SHA will need either a `.west/` workspace or a manually recorded `west.yml` manifest snapshot. The manifest lives at `west.yml` in the repo root — it should be read in a future task if module versions become relevant to BLE analysis.
 
+   **Status: DEFER.** Phase 1–4 are static code analysis only; west module versions become relevant only for runtime/bsim validation (Phase 5 onward). If/when a behavioral claim needs cross-module verification, snapshot `west.yml` at the pinned SHA at that time.
+
 2. **No Zephyr SDK**: Build-time checks (e.g., verifying that a Kconfig combination actually compiles) cannot be performed on this host. Any behavioral claim that requires a build artifact must be flagged as "not build-verified."
+
+   **Status: DEFER.** Same scope as Q1 — build-verified claims are not required for static analysis phases. Any artifact making a behavioral claim must explicitly flag it as "not build-verified."
 
 3. **No prj.conf-only Host-only exemplar**: Per `doc/connectivity/bluetooth/bluetooth-arch.rst:115-142`, Host-only and Combined share an identical Kconfig set (`CONFIG_BT=y` → `CONFIG_BT_HCI=y`) and are separated purely by devicetree (which `zephyr,bt-hci` node is chosen, and whether the local LL node is disabled). No `samples/bluetooth/*` directory has a `prj.conf` that *by itself* forces Host-only; the chosen exemplar (`samples/bluetooth/peripheral/` on `native_sim`, relying on `CONFIG_BT_USERCHAN`) depends on board-level DT and a `BOARD_NATIVE_SIM` gate (`drivers/bluetooth/hci/Kconfig:154-158`). To assert Host-only definitively, a board/DTS overlay (or the generated `.config` + devicetree) at build time must be inspected — not build-verified in this environment (see open question 2).
 
+   **Status: RESOLVED (by Q4's finding).** The premise of needing a "prj.conf-only Host-only exemplar" assumes Kconfig is the discriminator. Q4 establishes that the discriminator is the DTS `zephyr,bt-hci` chosen node, not prj.conf. Host-only is correctly identified by board DTS + overlay (no prj.conf-only exemplar should exist or be sought). See `subsys/bluetooth/CLAUDE.md` § "Build mode detection (analysis rule)".
+
 4. **Combined vs Host-only requires DT inspection, not just Kconfig**: Because `HAS_BT_CTLR` is selected transitively through `CONFIG_BT_LL_SW_SPLIT`, which is `default y` only under `DT_HAS_ZEPHYR_BT_HCI_LL_SW_SPLIT_ENABLED` (`subsys/bluetooth/controller/Kconfig:143-147`), determining whether a given build is Combined or Host-only cannot be done from `prj.conf` alone; it needs the board's devicetree (whether the local LL node is `okay`). Any per-board mode classification in later tasks must read the resolved devicetree, not just Kconfig.
+
+   **Status: RESOLVED.** Upgraded from open question to load-bearing analysis rule. See `subsys/bluetooth/CLAUDE.md` § "Build mode detection (analysis rule)" and § "Controller enablement chain". All Phase 1+ artifacts must cite DTS (board file + overlay) in addition to prj.conf when identifying a sample's build mode.
 
 5. **No `_includes/` subdirectory at the pinned revision**: Task 0.3 instructed excluding `doc/connectivity/bluetooth/_includes/` from the reference catalogue, but that directory does not exist at SHA `c2dc4ea037a` (verified via `find doc/connectivity/bluetooth -type d -name _includes`, no results; `0` `.rst` files). All 103 `.rst` files were therefore catalogued with none excluded. If a later upstream revision introduces `_includes/` (e.g. for reusable RST snippets), the References table must be re-run and that subdirectory re-evaluated for exclusion.
 
+   **Status: RESOLVED.** `_includes/` does not exist at pinned SHA (verified). All 103 `.rst` files catalogued. If a future upstream-sync introduces `_includes/`, References table must be re-evaluated — but that's a re-pin event, not a Phase 0 question.
+
 6. **Core Spec Part letters not independently verified**: The topic→Vol/Part mapping in `## References` follows the conventional Core 6.x layout, but several entries (LE PHY Vol 6 Part A; ISO/ISOAL Vol 6 Part G) are tagged "(verify Part letter)" because the exact edition was not cross-checked against a spec copy in this environment. Confirm against the precise Core 6.x edition before relying on a Part letter in any finding.
+
+   **Status: KNOWN UNKNOWN.** Terminology baseline is Core 5.4 (matches Zephyr's own docs); procedure-level citations in Phase 1+ will use Core 6.x section numbers with Part letters spot-verified against a spec copy at the time of citation. Tag any uncertain Part letter inline with `(Part letter to verify)`.

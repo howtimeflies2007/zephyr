@@ -26,10 +26,53 @@ subsys/bluetooth/
 ## Kconfig anatomy
 
 - `CONFIG_BT` is the master gate. Off → no BLE at all.
-- `CONFIG_BT_HCI` was historically the "use HCI" switch; on modern Zephyr it's almost always implied. Check `Kconfig` at the pinned SHA — the gating may have evolved.
-- `CONFIG_BT_CTLR=y` includes the controller (`controller/`) in the build.
-- Host features are enabled à la carte: `CONFIG_BT_CONN`, `CONFIG_BT_SMP`, `CONFIG_BT_GATT_*`, etc.
-- The **build mode** the analysis assumes (combined) sets both `CONFIG_BT_HCI=y` and `CONFIG_BT_CTLR=y`.
+- `CONFIG_BT_HCI` was historically the "use HCI" switch; on modern Zephyr
+  it's almost always implied by `CONFIG_BT`. Check `Kconfig` at the pinned
+  SHA — the gating may have evolved.
+- **There is NO user-settable `CONFIG_BT_CTLR` symbol.** The controller is
+  brought in via a devicetree → Kconfig chain (see below). `BT_CTLR_*`
+  symbols you DO see in prj.conf are *controller feature toggles*
+  (e.g. `BT_CTLR_PHY_2M`, `BT_CTLR_ADV_EXT`); they all `depend on
+  HAS_BT_CTLR` and are independent of bringing the controller in.
+- Host features are enabled à la carte: `CONFIG_BT_CONN`, `CONFIG_BT_SMP`,
+  `CONFIG_BT_GATT_*`, etc.
+- The **build mode** the analysis assumes (combined) is determined by
+  devicetree, not Kconfig. See "Build mode detection" below.
+
+### Controller enablement chain (verified at pinned SHA)
+
+    Application/board DTS:
+      chosen { zephyr,bt-hci = <&some_node>; };
+      &some_node {
+          compatible = "zephyr,bt-hci-ll-sw-split";
+          status = "okay";
+      };
+                              │
+                              ▼
+    Kconfig (auto-generated from DT):
+      DT_HAS_ZEPHYR_BT_HCI_LL_SW_SPLIT_ENABLED = y
+                              │
+                              ▼
+    subsys/bluetooth/controller/Kconfig:143
+      config BT_LL_SW_SPLIT
+          default y
+          depends on DT_HAS_ZEPHYR_BT_HCI_LL_SW_SPLIT_ENABLED   ◀ THE gate
+          select HAS_BT_CTLR
+                              │
+                              ▼
+    subsys/bluetooth/controller/Kconfig:140
+      config HAS_BT_CTLR
+          bool                                                  ◀ virtual,
+                                                                  no prompt,
+                                                                  only ever
+                                                                  select'd
+                              │
+                              ▼
+          controller/ source tree compiled in
+
+Vendor LLs (nRF Audio LL, Espressif controller, etc.) follow the same
+pattern: a vendor-specific Kconfig `select HAS_BT_CTLR` gated on a
+vendor-specific DT compatible.
 
 ## Logging convention
 
@@ -45,6 +88,35 @@ When tracing a function, the `LOG_MODULE_REGISTER` line tells you which Kconfig 
 ## `_internal.h` files — universal pattern
 
 Files named `*_internal.h` exist in both `host/` and `controller/`. **They are NEVER public API.** Cross-file usage within the same directory only. If you find a public header (`include/zephyr/bluetooth/...`) that pulls in `_internal.h`, that's a bug — flag it as an Open question.
+
+## Build mode detection (analysis rule)
+
+Combined vs host-only vs controller-only is NOT determined by Kconfig in
+prj.conf alone. The discriminator is the application's devicetree
+`zephyr,bt-hci` chosen node:
+
+| Chosen node's `compatible` | Build mode | Controller? | Host? |
+|---|---|---|---|
+| `zephyr,bt-hci-ll-sw-split` (or vendor local LL) | combined | yes (local) | yes |
+| `zephyr,bt-hci-uart` / `-spi` / `-ipc` / `-userchan` / etc. | host-only | no (external chip / other core) | yes |
+| n/a — app is the controller wrapper, host runs elsewhere | controller-only | yes | no |
+
+For controller-only builds, the app is usually one of
+`samples/bluetooth/hci_*` and uses `CONFIG_BT_HCI_RAW=y`; the chosen
+still points at a local LL.
+
+**Analysis consequences**:
+
+1. When an artifact references a sample, cite both the sample's
+   `prj.conf` AND its effective DTS (board file + any overlay) to
+   unambiguously identify the build mode.
+2. For Phase 1 (canonical mode: combined), pick samples whose effective
+   DTS resolves `zephyr,bt-hci` chosen to a local LL compatible.
+3. In combined mode, `drivers/bluetooth/hci/` source files are NOT in
+   the call path — the controller's own `controller/hci/hci_driver.c`
+   registers as the `bt_hci_driver` instead. Phase 1 Task 1.5 surveys
+   `drivers/bluetooth/hci/` for completeness but Task 1.4's diagram does
+   not traverse it.
 
 ## Phase 1 reminders (also in root CLAUDE.md)
 
