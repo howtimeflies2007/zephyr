@@ -185,6 +185,46 @@ Top-level dispatcher: `hci_event()` at `hci_core.c:3212`
 
 ---
 
+## Controller side
+
+This section traces how the Zephyr BLE controller receives HCI commands from the host (controller→inbound) and generates HCI events back to the host (controller→outbound). All code cited is in `subsys/bluetooth/controller/hci/` unless another file is noted; the analysis assumes **Combined build mode** (DTS `compatible = "zephyr,bt-hci-ll-sw-split"`, `CONFIG_BT_LL_SW_SPLIT=y`).
+
+### Transport registration
+
+The controller registers itself as a Zephyr `bt_hci` device via `DEVICE_API(bt_hci, hci_driver_api)` at `hci_driver.c:1067`, which populates `.open = hci_driver_open`, `.close = hci_driver_close`, `.send = hci_driver_send`. The device instance is created at `hci_driver.c:1079` via `BT_HCI_CONTROLLER_INIT(0)` (which expands to `DEVICE_DT_INST_DEFINE`), using the DTS compatible `zephyr,bt-hci-ll-sw-split`.
+
+On boot, the host calls `bt_hci_open(bt_dev.hci, bt_hci_recv)` at `host/hci_core.c:4742`. This resolves (via `DEVICE_API_GET`) to `hci_driver_open()` on the controller side. Inside `hci_driver_open()` at `hci_driver.c:1016`, the host's `bt_hci_recv` function pointer is stored in `data->recv` — this is the upward callback used for all future event delivery from controller to host.
+
+### Command reception and decoding
+
+In combined build mode, commands never cross a transport wire; they arrive as `net_buf` when the host calls `bt_hci_send()`, which resolves directly to `hci_driver_send()` on the controller side. `hci_driver_send()` strips the H:4 packet-type byte and dispatches by type: `BT_HCI_H4_CMD` packets are routed to `cmd_handle()`.
+
+Call chain (combined build, inbound commands — example: `LE_SET_ADV_ENABLE`):
+
+1. [HOST] `bt_send()` — `subsys/bluetooth/host/hci_core.c:4348` — calls `bt_hci_send(bt_dev.hci, buf)` at line 4357
+2. [HCI-XPORT] `bt_hci_send()` (inline) — `include/zephyr/drivers/bluetooth.h:227` — resolves to `DEVICE_API_GET(bt_hci, dev)->send(dev, buf)`, i.e. calls `hci_driver_send()`
+3. [CTLR] `hci_driver_send()` — `subsys/bluetooth/controller/hci/hci_driver.c:959` — strips the H:4 type byte via `net_buf_pull_u8()`, then calls `cmd_handle(dev, buf)` at line 979 for `BT_HCI_H4_CMD` packets
+4. [CTLR] `cmd_handle()` — `subsys/bluetooth/controller/hci/hci_driver.c:891` — calls `hci_cmd_handle(buf, &node_rx)` at line 897 to decode the command; the returned `evt` buffer is the synchronous response
+5. [CTLR] `hci_cmd_handle()` — `subsys/bluetooth/controller/hci/hci.c:5814` — pulls the `bt_hci_cmd_hdr`, extracts OGF and OCF, then dispatches by OGF: for `BT_OGF_LE` calls `controller_cmd_handle(ocf, cmd, &evt, node_rx)` at line 5851
+6. [CTLR] `controller_cmd_handle()` — `subsys/bluetooth/controller/hci/hci.c:4547` — switch on OCF; for `BT_OCF(BT_HCI_OP_LE_SET_ADV_ENABLE)` calls `le_set_adv_enable(cmd, evt)` at line 4623 (gated by `CONFIG_BT_BROADCASTER`)
+7. [CTLR] `le_set_adv_enable()` — `subsys/bluetooth/controller/hci/hci.c:1694` — decodes the parameter and calls `ll_adv_enable(cmd->enable)` (plain build without `CONFIG_BT_CTLR_ADV_EXT`) at line 1710; on return calls `cmd_complete_status(status)` at line 1713 to build the Command Complete event
+8. [CTLR] `ll_adv_enable()` — `subsys/bluetooth/controller/ll_sw/ull_adv.c:820` — ULL entry point for advertising enable/disable; schedules the advertising role via the ticker and mayfly infrastructure (Phase 2 territory; trace stops here per Phase 1 rules)
+
+### Event generation
+
+Synchronous command response events (e.g. `CMD_COMPLETE`) are built entirely within the command handler before returning to `cmd_handle()`. Asynchronous events (e.g. `LE_CONN_COMPLETE`) are built by ULL callbacks and injected via `recv_fifo` later.
+
+**Synchronous path** (CMD_COMPLETE for `LE_SET_ADV_ENABLE`):
+
+1. [CTLR] `cmd_complete_status()` — `subsys/bluetooth/controller/hci/hci.c:321` — calls `bt_hci_cmd_complete_create(_opcode, sizeof(*ccst))` (defined in `subsys/bluetooth/host/hci_common.c:35`, shared by both halves), which allocates a `net_buf` and writes the `BT_HCI_EVT_CMD_COMPLETE` header; appends the status byte
+2. [CTLR] `cmd_handle()` — `subsys/bluetooth/controller/hci/hci_driver.c:902` — after `hci_cmd_handle()` returns the event buffer, calls `bt_recv_prio(dev, evt)` (when `CONFIG_BT_CTLR_RX_PRIO_STACK_SIZE` is set) or `bt_recv(dev, evt)` otherwise
+3. [CTLR] `bt_recv_prio()` — `subsys/bluetooth/controller/hci/hci_driver.c:271` — checks event flags via `bt_hci_evt_get_flags()`; for `CMD_COMPLETE` (flagged `BT_HCI_EVT_FLAG_RECV_PRIO` only) calls `data->recv(dev, buf)` at line 286
+4. [HOST] `bt_hci_recv()` — `subsys/bluetooth/host/hci_core.c:4547` — the stored upward callback (registered at open time); acquires scheduler lock, calls `bt_recv_unsafe()` at line 4553, which dispatches `CMD_COMPLETE` synchronously via `hci_event_prio()` → `hci_cmd_complete()` → releases `sync_sem`, unblocking the caller of `bt_hci_cmd_send_sync()`
+
+**Thread model note:** The `recv_thread` ("BT CTLR RX", created at `hci_driver.c:1033`) handles asynchronous events by draining `recv_fifo` and calling `data->recv(dev, frag)` at line 881. When `CONFIG_BT_CTLR_RX_PRIO_STACK_SIZE` is set, a higher-priority `prio_recv_thread` ("BT CTLR RX pri", created at `hci_driver.c:1026`) handles priority events (e.g. `DISCONN_COMPLETE`) and feeds normal events into `recv_fifo` for `recv_thread` to process.
+
+---
+
 ## Open questions
 
 - The `BT_OGF_VS` (0x3f) group is defined at line 383 but no concrete VS opcodes appear in `hci_types.h`. Vendor-specific commands are expected to be defined in board/vendor extension headers (e.g., in-tree Zephyr vs. extensions). Need to locate where in-tree VS commands are declared (if any exist at this SHA).
@@ -192,3 +232,6 @@ Top-level dispatcher: `hci_event()` at `hci_core.c:3212`
 - The count of LE meta sub-events (`0x24`–`0x38`) includes several "v2" variants introduced in BT 5.4 and Core 6.0. These are present in the header but their spec section mapping has not been fully enumerated in this task.
 - (From Task 1.2) The `rx_work` work item is submitted to either the system workqueue or a dedicated `bt_workq`; the exact choice is determined by `CONFIG_BT_RECV_WORKQ_SYS` vs `CONFIG_BT_RECV_WORKQ_BT`. Neither option is a fixed-priority dedicated thread — this means RX processing priority can be preempted by other work items on the same queue. The impact on latency-sensitive events (e.g. `LE_CONN_COMPLETE`) is mitigated by the priority path (`hci_event_prio()`) that runs synchronously in the caller's context before queuing.
 - (From Task 1.2) `bt_hci_cmd_send_sync()` blocks the calling thread until `CMD_COMPLETE` or `CMD_STATUS` arrives. In combined builds the controller processes commands in the same OS context hierarchy — the interaction between the blocked caller thread, the TX processor workqueue, and the RX workqueue should be traced in Task 1.4 to confirm no deadlock is possible.
+- (From Task 1.3) `bt_hci_cmd_complete_create()` and `bt_hci_evt_create()` are implemented in `subsys/bluetooth/host/hci_common.c` (lines 35 and 19 respectively) and are called from the controller-side `hci.c`. This means the controller pulls a buffer allocation function from the host half of the tree in combined builds — a subtle cross-half dependency that should be captured in Task 1.6's buffer flow analysis.
+- (From Task 1.3) The controller has two receive threads: `recv_thread` ("BT CTLR RX") for normal events and, when `CONFIG_BT_CTLR_RX_PRIO_STACK_SIZE` is set, `prio_recv_thread` ("BT CTLR RX pri") for priority events. The existence and priority of `prio_recv_thread` depends on this Kconfig; the analysis should confirm which targets set it in combined builds.
+- (From Task 1.3) For `CONFIG_BT_CTLR_ADV_EXT`, `le_set_adv_enable()` rejects legacy advertising commands (via `adv_cmds_legacy_check()`) and requires the use of extended advertising commands instead. The exact fallback/error behavior in combined builds when `CONFIG_BT_CTLR_ADV_EXT=y` but the host uses legacy commands needs verification in Task 1.4's sequence diagram.
