@@ -146,10 +146,10 @@ Human review of `00-orientation.md` before proceeding. If the build-mode table i
 - **Dependencies:** 1.2, 1.3
 
 ### Task 1.5 — Transport driver inventory
-- [ ] Read `drivers/bluetooth/hci/` directory listing + `Kconfig`
-- [ ] For UART, SPI, IPC, userchan, virtual: identify (a) Kconfig symbol, (b) the H4/HCI framing it implements, (c) where it plugs into the host (`bt_hci_driver` struct registration)
-- [ ] Deliverable: `phase-1-hci/transport-drivers.md`
-- [ ] Verification: table with one row per transport, with Kconfig + file path + framing reference + registration call site
+- [x] Read `drivers/bluetooth/hci/` directory listing + `Kconfig`
+- [x] For UART, SPI, IPC, userchan, virtual: identify (a) Kconfig symbol, (b) the H4/HCI framing it implements, (c) where it plugs into the host (`bt_hci_driver` struct registration)
+- [x] Deliverable: `phase-1-hci/transport-drivers.md`
+- [x] Verification: table with one row per transport, with Kconfig + file path + framing reference + registration call site
 - **Dependencies:** 1.2
 
 ### Task 1.6 — Buffer flow at the boundary
