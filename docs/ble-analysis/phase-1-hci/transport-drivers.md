@@ -14,28 +14,28 @@ Zephyr selects an HCI transport driver at build time through the `zephyr,bt-hci`
 
 | Transport | Kconfig symbol | DT compatible | Framing | Source file | `send()` function | Registration call | Notes |
 |---|---|---|---|---|---|---|---|
-| H4 UART | `CONFIG_BT_H4` (Kconfig:13) | `zephyr,bt-hci-uart` | H4: 1-byte type prefix (0x01 cmd / 0x02 ACL / 0x04 evt / 0x05 ISO) [Core 6.0, Vol 4, Part A] | `drivers/bluetooth/hci/h4.c` | `h4_send` (h4.c:485) | `DEVICE_DT_INST_DEFINE` (h4.c:630) | Interrupt-driven UART; spawns dedicated `bt_rx_thread`; HW flow control required |
-| H5 UART | `CONFIG_BT_H5` (Kconfig:22) | `zephyr,bt-hci-3wire-uart` | H5: SLIP-framed, 4-byte header, seq+ack, CRC optional [Core 6.0, Vol 4, Part A] | `drivers/bluetooth/hci/h5.c` | `h5_queue` (h5.c:598) | `DEVICE_DT_INST_DEFINE` (h5.c:806) | EXPERIMENTAL; link state machine with retransmissions; survives UART glitches at complexity cost |
-| SPI (Zephyr generic) | `CONFIG_BT_SPI_ZEPHYR` (Kconfig:94) | `zephyr,bt-hci-spi` | H4-over-SPI: IRQ line signals controller readiness; half-duplex SPI transaction carries H4 packet | `drivers/bluetooth/hci/spi.c` | `bt_spi_send` (spi.c:302) | `DEVICE_DT_INST_DEFINE` (spi.c:443) | Targets controllers running Zephyr firmware |
-| SPI (ST BlueNRG) | `CONFIG_BT_SPI_BLUENRG` (Kconfig:103) | `st,hci-spi-v1` or `st,hci-spi-v2` | H4-over-SPI; ST vendor framing on top | `drivers/bluetooth/hci/hci_spi_st.c` | `bt_spi_send` (hci_spi_st.c:722) | `DEVICE_DT_INST_DEFINE` (hci_spi_st.c:752) | Dual-compat (v1/v2); optional `BT_BLUENRG_ACI` for public address |
-| IPC (nRF53xx) | `CONFIG_BT_HCI_IPC` (Kconfig:32) | `zephyr,bt-hci-ipc` | Raw HCI bytes over `ipc_service` memory channel; no on-wire framing | `drivers/bluetooth/hci/ipc.c` | `bt_ipc_send` (ipc.c:263) | `DEVICE_DT_INST_DEFINE` (ipc.c:403) | nRF5340 split-core (app core + net core); requires `IPC_SERVICE` + `MBOX`; enables `BT_HAS_HCI_VS` |
-| User channel (native_sim) | `CONFIG_BT_USERCHAN` (Kconfig:154) | `zephyr,bt-hci-userchan` | H4 over Linux `AF_BLUETOOTH` / `BTPROTO_HCI` user-channel socket | `drivers/bluetooth/hci/userchan.c` | `uc_send` (userchan.c:343) | `DEVICE_DT_INST_DEFINE` (userchan.c:441) | `native_sim`/`native_sim//64` only; adapter must be down; uses `NATIVE_USE_NSI_ERRNO` |
+| H4 UART | `CONFIG_BT_H4` (drivers/bluetooth/hci/Kconfig:13) | `zephyr,bt-hci-uart` | H4: 1-byte type prefix (0x01 cmd / 0x02 ACL / 0x04 evt / 0x05 ISO) [Core 6.0, Vol 4, Part A] | `drivers/bluetooth/hci/h4.c` | `h4_send` (h4.c:485) | `DEVICE_DT_INST_DEFINE` (h4.c:630) | Interrupt-driven UART; spawns dedicated `bt_rx_thread`; HW flow control required |
+| H5 UART | `CONFIG_BT_H5` (drivers/bluetooth/hci/Kconfig:22) | `zephyr,bt-hci-3wire-uart` | H5: SLIP-framed, 4-byte header, seq+ack, CRC optional [Core 6.0, Vol 4, Part A] | `drivers/bluetooth/hci/h5.c` | `h5_queue` (h5.c:598) | `DEVICE_DT_INST_DEFINE` (h5.c:806) | EXPERIMENTAL; link state machine with retransmissions; survives UART glitches at complexity cost |
+| SPI (Zephyr generic) | `CONFIG_BT_SPI_ZEPHYR` (drivers/bluetooth/hci/Kconfig:94) | `zephyr,bt-hci-spi` | H4-over-SPI: IRQ line signals controller readiness; half-duplex SPI transaction carries H4 packet | `drivers/bluetooth/hci/spi.c` | `bt_spi_send` (spi.c:302) | `DEVICE_DT_INST_DEFINE` (spi.c:443) | Targets controllers running Zephyr firmware |
+| SPI (ST BlueNRG) | `CONFIG_BT_SPI_BLUENRG` (drivers/bluetooth/hci/Kconfig:103) | `st,hci-spi-v1` or `st,hci-spi-v2` | H4-over-SPI; ST vendor framing on top | `drivers/bluetooth/hci/hci_spi_st.c` | `bt_spi_send` (hci_spi_st.c:722) | `DEVICE_DT_INST_DEFINE` (hci_spi_st.c:752) | Dual-compat (v1/v2); optional `BT_BLUENRG_ACI` for public address |
+| IPC (nRF53xx) | `CONFIG_BT_HCI_IPC` (drivers/bluetooth/hci/Kconfig:32) | `zephyr,bt-hci-ipc` | Raw HCI bytes over `ipc_service` memory channel; no on-wire framing | `drivers/bluetooth/hci/ipc.c` | `bt_ipc_send` (ipc.c:263) | `DEVICE_DT_INST_DEFINE` (ipc.c:403) | nRF5340 split-core (app core + net core); requires `IPC_SERVICE` + `MBOX`; enables `BT_HAS_HCI_VS` |
+| User channel (native_sim) | `CONFIG_BT_USERCHAN` (drivers/bluetooth/hci/Kconfig:154) | `zephyr,bt-hci-userchan` | H4 over Linux `AF_BLUETOOTH` / `BTPROTO_HCI` user-channel socket | `drivers/bluetooth/hci/userchan.c` | `uc_send` (userchan.c:343) | `DEVICE_DT_INST_DEFINE` (userchan.c:441) | `native_sim`/`native_sim//64` only; adapter must be down; uses `NATIVE_USE_NSI_ERRNO` |
 | Combined / in-tree LL | `CONFIG_BT_LL_SW_SPLIT` (controller Kconfig) | `zephyr,bt-hci-ll-sw-split` | In-process function calls; no wire framing | `subsys/bluetooth/controller/hci/hci_driver.c` | `hci_driver_send` (hci_driver.c:959) | `BT_HCI_CONTROLLER_INIT(0)` → `DEVICE_DT_INST_DEFINE` (hci_driver.c:1073-1079) | Used in combined builds (nRF5x etc.); drivers in `drivers/bluetooth/hci/` are inactive |
 
 ### Additional vendor-specific drivers (not in primary analysis scope)
 
 | Driver | Kconfig | DT compatible | Source file | send() | Registration |
 |---|---|---|---|---|---|
-| STM32WB IPM | `CONFIG_BT_STM32_IPM` (Kconfig:120) | `st,stm32wb-rf` | `ipm_stm32wb.c` | `bt_ipm_send` (line 702) | `DEVICE_DT_INST_DEFINE` (line 723) |
-| STM32WBA | `CONFIG_BT_STM32WBA` (Kconfig:130) | `st,hci-stm32wba` | `hci_stm32wba.c` | `bt_hci_stm32wba_send` (line 622) | `DEVICE_DT_INST_DEFINE` (line 629) |
-| STM32WB0 | `CONFIG_BT_STM32WB0` (Kconfig:140) | `st,hci-stm32wb0` | `hci_stm32wb0.c` | `bt_hci_stm32wb0_send` (line 574) | `DEVICE_DT_INST_DEFINE` (line 581) |
-| ESP32 | `CONFIG_BT_ESP32` (Kconfig:167) | `espressif,esp32-bt-hci` | `hci_esp32.c` | `bt_esp32_send` (line 860) | `DEVICE_DT_INST_DEFINE` (line 866) |
-| NXP (UART/H4) | `CONFIG_BT_NXP` (Kconfig:213) | `nxp,hci-ble` | `hci_nxp.c` | `bt_nxp_send` (line 637) | `DEVICE_DT_INST_DEFINE` (line 661) |
-| Infineon CYW208XX | `CONFIG_BT_CYW208XX` (Kconfig:223) | `infineon,cyw208xx-hci` | `hci_infineon_cyw208xx.c` | `cyw208xx_send` (line 375) | `DEVICE_DT_INST_DEFINE` (line 551) |
-| Ambiq Apollo SPI | `CONFIG_BT_AMBIQ_HCI` (Kconfig:230) | `ambiq,bt-hci-spi` | `hci_ambiq.c` | `bt_apollo_send` (line 419) | `DEVICE_DT_INST_DEFINE` (line 446) |
-| Renesas DA1469x | `CONFIG_BT_DA1469X` (Kconfig:205) | `renesas,bt-hci-da1469x` | `hci_da1469x.c` | `bt_da1469x_send` (line 481) | `DEVICE_DT_INST_DEFINE` (line 501) |
+| STM32WB IPM | `CONFIG_BT_STM32_IPM` (drivers/bluetooth/hci/Kconfig:120) | `st,stm32wb-rf` | `ipm_stm32wb.c` | `bt_ipm_send` (line 702) | `DEVICE_DT_INST_DEFINE` (line 723) |
+| STM32WBA | `CONFIG_BT_STM32WBA` (drivers/bluetooth/hci/Kconfig:130) | `st,hci-stm32wba` | `hci_stm32wba.c` | `bt_hci_stm32wba_send` (line 622) | `DEVICE_DT_INST_DEFINE` (line 629) |
+| STM32WB0 | `CONFIG_BT_STM32WB0` (drivers/bluetooth/hci/Kconfig:140) | `st,hci-stm32wb0` | `hci_stm32wb0.c` | `bt_hci_stm32wb0_send` (line 574) | `DEVICE_DT_INST_DEFINE` (line 581) |
+| ESP32 | `CONFIG_BT_ESP32` (drivers/bluetooth/hci/Kconfig:167) | `espressif,esp32-bt-hci` | `hci_esp32.c` | `bt_esp32_send` (line 860) | `DEVICE_DT_INST_DEFINE` (line 866) |
+| NXP (UART/H4) | `CONFIG_BT_NXP` (drivers/bluetooth/hci/Kconfig:213) | `nxp,hci-ble` | `hci_nxp.c` | `bt_nxp_send` (line 637) | `DEVICE_DT_INST_DEFINE` (line 661) |
+| Infineon CYW208XX | `CONFIG_BT_CYW208XX` (drivers/bluetooth/hci/Kconfig:223) | `infineon,cyw208xx-hci` | `hci_infineon_cyw208xx.c` | `cyw208xx_send` (line 375) | `DEVICE_DT_INST_DEFINE` (line 551) |
+| Ambiq Apollo SPI | `CONFIG_BT_AMBIQ_HCI` (drivers/bluetooth/hci/Kconfig:230) | `ambiq,bt-hci-spi` | `hci_ambiq.c` | `bt_apollo_send` (line 419) | `DEVICE_DT_INST_DEFINE` (line 446) |
+| Renesas DA1469x | `CONFIG_BT_DA1469X` (drivers/bluetooth/hci/Kconfig:205) | `renesas,bt-hci-da1469x` | `hci_da1469x.c` | `bt_da1469x_send` (line 481) | `DEVICE_DT_INST_DEFINE` (line 501) |
 | Realtek Bee | n/a (DT-gated) | `realtek,bee-bt-hci` | `hci_bee.c` | `bt_hci_bee_send` (line 292) | `DEVICE_DT_INST_DEFINE` (line 298) |
-| SiFli SF32LB | `CONFIG_BT_SF32LB` (Kconfig:373) | `sifli,sf32lb-mailbox` | `hci_sf32lb.c` | (IPC mailbox) | (IPC mailbox) |
+| SiFli SF32LB | `CONFIG_BT_SF32LB` (drivers/bluetooth/hci/Kconfig:373) | `sifli,sf32lb-mailbox` | `hci_sf32lb.c` | (IPC mailbox) | (IPC mailbox) |
 
 ---
 
@@ -77,7 +77,7 @@ Used on nRF5340 targets (split-image: host on application core, controller on ne
 
 `CONFIG_BT_HCI_IPC_SEND_RETRY_COUNT` (default 3) and `CONFIG_BT_HCI_IPC_SEND_RETRY_DELAY_US` (default 75 µs) govern retry behavior when `ipc_service_send` returns `-ENOMEM`.
 
-The `BT_DRIVER_QUIRK_NO_AUTO_DLE` quirk (Kconfig:281) defaults to `y` when `BT_HCI_IPC` is set, because the Zephyr open-source controller does not auto-initiate Data Length Update for new connections.
+The `BT_DRIVER_QUIRK_NO_AUTO_DLE` quirk (drivers/bluetooth/hci/Kconfig:281) defaults to `y` when `BT_HCI_IPC` is set, because the Zephyr open-source controller does not auto-initiate Data Length Update for new connections.
 
 ### User Channel (`userchan.c`)
 
