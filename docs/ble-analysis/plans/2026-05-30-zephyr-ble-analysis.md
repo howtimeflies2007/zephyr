@@ -132,10 +132,10 @@ Human review of `00-orientation.md` before proceeding. If the build-mode table i
 - **Dependencies:** 1.1
 
 ### Task 1.3 — Controller-side dispatch (commands in, events out)
-- [ ] Read `subsys/bluetooth/controller/hci/hci.c`, `subsys/bluetooth/controller/hci/hci_driver.c`
-- [ ] Trace mirror image: how a HCI command is decoded, dispatched to LL handler, and how events are generated and pushed back to the transport
-- [ ] Deliverable: `phase-1-hci/boundary.md` § "Controller side"
-- [ ] Verification: includes a function-call list mirroring 1.2 in the opposite direction
+- [x] Read `subsys/bluetooth/controller/hci/hci.c`, `subsys/bluetooth/controller/hci/hci_driver.c`
+- [x] Trace mirror image: how a HCI command is decoded, dispatched to LL handler, and how events are generated and pushed back to the transport
+- [x] Deliverable: `phase-1-hci/boundary.md` § "Controller side"
+- [x] Verification: includes a function-call list mirroring 1.2 in the opposite direction
 - **Dependencies:** 1.1
 
 ### Task 1.4 — Cross-half sequence diagram
