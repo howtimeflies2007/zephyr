@@ -134,8 +134,61 @@ Additional v2 / Channel Sounding sub-events (hex `0x24`–`0x38`) are also defin
 
 ---
 
+## Host side
+
+This section traces how the Zephyr BLE host originates HCI commands (host→controller) and receives HCI events (controller→host). All code cited is in `subsys/bluetooth/host/hci_core.c` unless another file is noted; the analysis assumes **Combined build mode** (`CONFIG_BT=y`, local LL via `zephyr,bt-hci-ll-sw-split`).
+
+### Command path (host → controller)
+
+Commands leave the host through a two-step queue: the caller enqueues a `net_buf` into `bt_dev.cmd_tx_queue`, a work item drains the queue one command at a time (respecting the controller's flow-control semaphore `ncmd_sem`), and then calls `bt_send()` → `bt_hci_send()` → the registered transport driver's `send` function pointer.
+
+Call chain example — legacy LE advertising enable ([Combined build, `CONFIG_BT=y`, `CONFIG_BT_BROADCASTER=y`]):
+
+1. [HOST] `bt_le_adv_start()` — `subsys/bluetooth/host/adv.c:1278` — public API entry point; looks up or creates the legacy advertiser object and dispatches to `adv_start_legacy()`
+2. [HOST] `adv_start_legacy()` — `subsys/bluetooth/host/adv.c:891` — fills `bt_hci_cp_le_set_adv_param`, allocates a command buffer via `bt_hci_cmd_alloc()`, calls `bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_ADV_PARAM, ...)` at line 977, then calls `bt_le_adv_set_enable(adv, true)` at line 996
+3. [HOST] `bt_le_adv_set_enable()` — `subsys/bluetooth/host/adv.c:358` — dispatcher; with no extended-adv support falls through to `bt_le_adv_set_enable_legacy()`
+4. [HOST] `bt_le_adv_set_enable_legacy()` — `subsys/bluetooth/host/adv.c:296` — allocates a command buffer and calls `bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_ADV_ENABLE, buf, NULL)` at line 315
+5. [HOST] `bt_hci_cmd_send_sync()` — `subsys/bluetooth/host/hci_core.c:415` — initialises a local `k_sem` on the stack, stores a pointer to it in `cmd(buf)->sync`, then calls `bt_hci_cmd_send()` at line 444; suspends the calling thread on `k_sem_take(&sync_sem, HCI_CMD_TIMEOUT)` at line 481 until the command-complete event gives the semaphore
+6. [HOST] `bt_hci_cmd_send()` — `subsys/bluetooth/host/hci_core.c:364` — prepends the H:4 packet-type byte (`BT_HCI_H4_CMD`) and the HCI command header, enqueues the buffer into `bt_dev.cmd_tx_queue` via `k_fifo_put()` at line 408, then calls `bt_tx_irq_raise()` at line 409 to schedule the TX processor
+7. [HOST] `tx_processor()` (work handler) — `subsys/bluetooth/host/hci_core.c:5141` — runs in the system workqueue (or dedicated `bt_tx_processor` workqueue if `CONFIG_BT_TX_PROCESSOR_THREAD=y`); calls `process_pending_cmd()` at line 5153
+8. [HOST] `process_pending_cmd()` — `subsys/bluetooth/host/hci_core.c:5129` — takes `bt_dev.ncmd_sem` (one outstanding command at a time) then calls `hci_core_send_cmd()` at line 5133
+9. [HOST] `hci_core_send_cmd()` — `subsys/bluetooth/host/hci_core.c:3234` — dequeues the buffer from `bt_dev.cmd_tx_queue`, saves a reference in `bt_dev.sent_cmd`, calls `bt_send()` at line 3255
+10. [HOST] `bt_send()` — `subsys/bluetooth/host/hci_core.c:4348` — calls `bt_hci_send(bt_dev.hci, buf)` at line 4357
+11. [HCI-XPORT] `bt_hci_send()` (inline) — `include/zephyr/drivers/bluetooth.h:227` — resolves to `DEVICE_API_GET(bt_hci, dev)->send(dev, buf)`; in combined build this calls the controller's registered `send` implementation (in `subsys/bluetooth/controller/hci/hci_driver.c`)
+
+### RX thread and event dequeue
+
+The host does not have a dedicated RX kernel thread in recent Zephyr. Instead, incoming buffers are placed on `bt_dev.rx_queue` (a `sys_slist_t` defined at `subsys/bluetooth/host/hci_core.h:405`) and processed by the `rx_work` work item, which is submitted to either the system workqueue (`CONFIG_BT_RECV_WORKQ_SYS`) or a dedicated `bt_workq` (`CONFIG_BT_RECV_WORKQ_BT`).
+
+- `rx_work` work item: `subsys/bluetooth/host/hci_core.c:118` (`K_WORK_DEFINE(rx_work, rx_work_handler)`)
+- Dedicated BT workqueue (optional): started at `hci_core.c:4735–4739` when `CONFIG_BT_RECV_WORKQ_BT=y`; thread named `"BT RX WQ"` with priority `K_PRIO_COOP(CONFIG_BT_RX_PRIO)`
+- Entry function: `rx_work_handler()` at `hci_core.c:4616`
+- Dequeue call: `net_buf_slist_get(&bt_dev.rx_queue)` at `hci_core.c:4624`
+
+The path from the controller's callback to the queue:
+
+- Controller (or transport driver) calls `bt_hci_recv()` at `hci_core.c:4547` — this is the function registered with `bt_hci_open()` at line 4742
+- `bt_hci_recv()` acquires the scheduler lock and calls `bt_recv_unsafe()` at line 4553
+- `bt_recv_unsafe()` at `hci_core.c:4481` inspects the H:4 type byte; events flagged `BT_HCI_EVT_FLAG_RECV_PRIO` (e.g. `CMD_COMPLETE`, `CMD_STATUS`) are dispatched synchronously via `hci_event_prio()` at line 4526 **before** queuing; events flagged `BT_HCI_EVT_FLAG_RECV` are placed on `bt_dev.rx_queue` via `rx_queue_put()` at line 4530 and `rx_work` is submitted
+
+### Event dispatch
+
+Two-tier dispatch is used: a top-level function routes by event code, and for LE meta events a second function routes by subevent code.
+
+Top-level dispatcher: `hci_event()` at `hci_core.c:3212`
+- Called from `rx_work_handler()` at `hci_core.c:4645` for `BT_HCI_H4_EVT` buffers
+- Pulls the `bt_hci_evt_hdr` from the buffer, then calls `handle_event(hdr->evt, buf, normal_events, ...)` at line 3229
+- `handle_event()` at `hci_core.c:226` iterates the `normal_events[]` table (defined at `hci_core.c:3091`) and invokes the matching handler by event code
+- Standard events: switch via `normal_events[]` table — e.g. `BT_HCI_EVT_DISCONN_COMPLETE` → `hci_disconn_complete()` (line 3149 in table), `BT_HCI_EVT_ENCRYPT_CHANGE` → `hci_encrypt_change()` (line 3153 in table)
+- Priority events: a parallel path through `hci_event_prio()` at `hci_core.c:4433` dispatches against `prio_events[]` table (line 4412); `CMD_COMPLETE` and `CMD_STATUS` are handled here — `hci_cmd_complete()` at `hci_core.c:2573` gives `sync_sem` back to the blocked caller of `bt_hci_cmd_send_sync()`
+- LE meta events: `BT_HCI_EVT_LE_META_EVENT` (code `0x3e`, `hci_types.h:3417`) → `hci_le_meta_event()` at `hci_core.c:3080` (registered in `normal_events[]` at line 3094) → pulls the subevent byte → `handle_event(evt->subevent, buf, meta_events, ...)` at line 3088 → dispatches via `meta_events[]` table at `hci_core.c:2896`; e.g. `BT_HCI_EVT_LE_CONN_COMPLETE` (subevent `0x01`) → `le_legacy_conn_complete()` (table entry at line 2902), `BT_HCI_EVT_LE_ADVERTISING_REPORT` (subevent `0x02`) → `bt_hci_le_adv_report()` (line 2898, gated by `CONFIG_BT_OBSERVER`)
+
+---
+
 ## Open questions
 
 - The `BT_OGF_VS` (0x3f) group is defined at line 383 but no concrete VS opcodes appear in `hci_types.h`. Vendor-specific commands are expected to be defined in board/vendor extension headers (e.g., in-tree Zephyr vs. extensions). Need to locate where in-tree VS commands are declared (if any exist at this SHA).
 - Spec section numbers for the newest commands (`0x207F` `BT_HCI_OP_LE_SET_EXT_ADV_PARAM_V2`, `0x2085`–`0x20A5` range, Channel Sounding group) map to Core 6.0 Vol 4 Part E sections beyond §7.8.130. The exact section number for each needs verification against the Core 6.0 spec table of contents; placeholder citations have been used for commands beyond `0x207F`.
 - The count of LE meta sub-events (`0x24`–`0x38`) includes several "v2" variants introduced in BT 5.4 and Core 6.0. These are present in the header but their spec section mapping has not been fully enumerated in this task.
+- (From Task 1.2) The `rx_work` work item is submitted to either the system workqueue or a dedicated `bt_workq`; the exact choice is determined by `CONFIG_BT_RECV_WORKQ_SYS` vs `CONFIG_BT_RECV_WORKQ_BT`. Neither option is a fixed-priority dedicated thread — this means RX processing priority can be preempted by other work items on the same queue. The impact on latency-sensitive events (e.g. `LE_CONN_COMPLETE`) is mitigated by the priority path (`hci_event_prio()`) that runs synchronously in the caller's context before queuing.
+- (From Task 1.2) `bt_hci_cmd_send_sync()` blocks the calling thread until `CMD_COMPLETE` or `CMD_STATUS` arrives. In combined builds the controller processes commands in the same OS context hierarchy — the interaction between the blocked caller thread, the TX processor workqueue, and the RX workqueue should be traced in Task 1.4 to confirm no deadlock is possible.
