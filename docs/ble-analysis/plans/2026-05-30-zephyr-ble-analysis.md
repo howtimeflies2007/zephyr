@@ -153,10 +153,10 @@ Human review of `00-orientation.md` before proceeding. If the build-mode table i
 - **Dependencies:** 1.2
 
 ### Task 1.6 — Buffer flow at the boundary
-- [ ] Identify the `net_buf` pools used for HCI commands, command-complete events, ACL data, ISO data — names, sizes, locations
-- [ ] Document the fragmentation rules (HCI ACL fragments vs. L2CAP PDUs)
-- [ ] Deliverable: `phase-1-hci/boundary.md` § "Buffers"
-- [ ] Verification: each pool has Kconfig sizing knob cited and lives in either `hci_core.c` or controller hci module
+- [x] Identify the `net_buf` pools used for HCI commands, command-complete events, ACL data, ISO data — names, sizes, locations
+- [x] Document the fragmentation rules (HCI ACL fragments vs. L2CAP PDUs)
+- [x] Deliverable: `phase-1-hci/boundary.md` § "Buffers"
+- [x] Verification: each pool has Kconfig sizing knob cited and lives in either `hci_core.c` or controller hci module
 - **Dependencies:** 1.2, 1.3
 
 ### 🔍 Review checkpoint after Phase 1
