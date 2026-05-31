@@ -1,0 +1,54 @@
+%% Revision: c2dc4ea037a6c1c0dce37d44949b066face27bea
+%% Task 1.4 — HCI_LE_Set_Advertising_Enable full cross-half flow
+%% OpCode 0x200a (OGF=0x08 LE, OCF=0x000A). Combined build mode (Host + in-tree SW Controller).
+%% Shows outbound command path HOST->CTLR, LL entry, and CMD_COMPLETE return CTLR->HOST.
+
+sequenceDiagram
+    participant APP
+    participant HOST
+    participant XPORT as HCI-XPORT
+    participant CTLR
+    participant LL
+
+    rect rgb(220, 240, 255)
+    Note over APP,CTLR: Command path (outbound) — OpCode 0x200a (OGF=0x08, OCF=0x000A)
+    APP->>HOST: bt_le_adv_start() adv.c:1278
+    HOST->>HOST: adv_start_legacy() adv.c:891
+    HOST->>HOST: bt_le_adv_set_enable() adv.c:358
+    HOST->>HOST: bt_le_adv_set_enable_legacy() adv.c:296
+    HOST->>HOST: bt_hci_cmd_send_sync() hci_core.c:415
+    activate HOST
+    Note over HOST: blocks on k_sem_take(sync_sem) hci_core.c:481
+    HOST->>HOST: bt_hci_cmd_send() hci_core.c:364
+    Note over HOST: k_fifo_put(cmd_tx_queue) hci_core.c:408, bt_tx_irq_raise() hci_core.c:409
+    HOST->>HOST: tx_processor() hci_core.c:5141
+    HOST->>HOST: process_pending_cmd() hci_core.c:5129
+    HOST->>HOST: hci_core_send_cmd() hci_core.c:3234
+    HOST->>HOST: bt_send() hci_core.c:4348
+    HOST->>XPORT: bt_hci_send() bluetooth.h:227
+    XPORT->>CTLR: hci_driver_send() hci_driver.c:959
+    CTLR->>CTLR: cmd_handle() hci_driver.c:891
+    CTLR->>CTLR: hci_cmd_handle() hci.c:5814
+    CTLR->>CTLR: controller_cmd_handle() hci.c:4547
+    CTLR->>CTLR: le_set_adv_enable() hci.c:1694
+    end
+
+    rect rgb(220, 255, 220)
+    Note over CTLR,LL: LL execution (Phase 2 territory — entry point only)
+    CTLR->>LL: ll_adv_enable() ull_adv.c:820
+    LL-->>CTLR: returns status (hci.c:1710)
+    end
+
+    rect rgb(255, 240, 220)
+    Note over HOST,CTLR: CMD_COMPLETE return (inbound)
+    CTLR->>CTLR: cmd_complete_status() hci.c:321
+    Note over CTLR: bt_hci_cmd_complete_create() hci_common.c:35
+    CTLR->>CTLR: cmd_handle() builds evt buf hci_driver.c:902
+    CTLR->>XPORT: bt_recv_prio() hci_driver.c:271
+    XPORT->>HOST: data->recv(dev, buf) hci_driver.c:286
+    HOST->>HOST: bt_hci_recv() hci_core.c:4547
+    HOST->>HOST: hci_event_prio() hci_core.c:4433
+    HOST->>HOST: hci_cmd_complete() gives sync_sem hci_core.c:2573
+    deactivate HOST
+    HOST-->>APP: bt_hci_cmd_send_sync() returns status hci_core.c:481
+    end
