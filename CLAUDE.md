@@ -112,6 +112,7 @@ tests/bluetooth/             # Unit tests + BabbleSim (bsim) integration tests
 6. **Vendor LLL is not generic LLL**. When reading `ll_sw/nordic/` or `ll_sw/openisa/`, label findings as vendor-specific; do not generalize to "the controller."
 7. **Spec citations beat code intuition**. If code and spec seem to disagree, the spec wins as documentation of intent; flag the discrepancy.
 8. **Out of scope**: BR/EDR (`host/classic/`), Mesh (`host/mesh/`), and Audio (`host/audio/`) are large enough to be separate analyses. Do not pull them in unless the current task explicitly asks.
+9. **Use full paths in citations, always.** Even in table cells where adjacent columns show the path. `host/foo.c:123` is not a valid citation; `subsys/bluetooth/host/foo.c:123` is. The `check-citations.sh` script resolves citations against repo root and will fail on abbreviated paths. Same applies to `Kconfig:NNN` — specify the full path (e.g. `drivers/bluetooth/hci/Kconfig:NNN`). Spec citations (`[Core 6.x, Vol Y, Part Z, §N.M.K]`) are not subject to this rule since they have their own conventional format.
 
 ## Per-module CLAUDE.md files (planned)
 
