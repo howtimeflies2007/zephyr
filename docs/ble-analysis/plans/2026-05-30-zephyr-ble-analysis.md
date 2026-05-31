@@ -125,10 +125,10 @@ Human review of `00-orientation.md` before proceeding. If the build-mode table i
 - **Dependencies:** 0.4
 
 ### Task 1.2 — Host-side dispatch (commands out, events in)
-- [ ] Read `subsys/bluetooth/host/hci_core.c`, `subsys/bluetooth/host/hci_core.h`
-- [ ] Trace: who calls `bt_hci_cmd_send_sync()`? Where does the RX thread dequeue events? Which function dispatches `hci_event` → per-event handler? How are LE meta events split off?
-- [ ] Deliverable: `phase-1-hci/boundary.md` § "Host side"
-- [ ] Verification: includes a function-call list of length ≥ 6 going from `bt_*` API → HCI driver, with file:line for each hop
+- [x] Read `subsys/bluetooth/host/hci_core.c`, `subsys/bluetooth/host/hci_core.h`
+- [x] Trace: who calls `bt_hci_cmd_send_sync()`? Where does the RX thread dequeue events? Which function dispatches `hci_event` → per-event handler? How are LE meta events split off?
+- [x] Deliverable: `phase-1-hci/boundary.md` § "Host side"
+- [x] Verification: includes a function-call list of length ≥ 6 going from `bt_*` API → HCI driver, with file:line for each hop
 - **Dependencies:** 1.1
 
 ### Task 1.3 — Controller-side dispatch (commands in, events out)
