@@ -139,10 +139,10 @@ Human review of `00-orientation.md` before proceeding. If the build-mode table i
 - **Dependencies:** 1.1
 
 ### Task 1.4 — Cross-half sequence diagram
-- [ ] Pick `HCI_LE_Set_Advertising_Enable` as the canonical example
-- [ ] Produce a mermaid sequence diagram showing: app → host API → host HCI → transport → controller HCI → LL → ACK event back
-- [ ] Deliverable: `phase-1-hci/cmd-event-flow.mmd`
-- [ ] Verification: every arrow has a file:line label; diagram renders without errors via `mmdc -i cmd-event-flow.mmd -o /tmp/x.svg`
+- [x] Pick `HCI_LE_Set_Advertising_Enable` as the canonical example
+- [x] Produce a mermaid sequence diagram showing: app → host API → host HCI → transport → controller HCI → LL → ACK event back
+- [x] Deliverable: `phase-1-hci/cmd-event-flow.mmd`
+- [x] Verification: every arrow has a file:line label; diagram renders without errors via `mmdc -i cmd-event-flow.mmd -o /tmp/x.svg`
 - **Dependencies:** 1.2, 1.3
 
 ### Task 1.5 — Transport driver inventory
