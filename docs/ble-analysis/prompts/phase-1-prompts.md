@@ -242,11 +242,12 @@ Specifically:
    must reference the same struct and field. If they don't, STOP
    and report — one of 1.2 or 1.3 is wrong.
 3. Create docs/ble-analysis/phase-1-hci/cmd-event-flow.mmd as a
-   mermaid sequenceDiagram. Use exactly four participants:
+   mermaid sequenceDiagram. Use four or five participants:
      participant App
      participant Host as Host (subsys/bluetooth/host)
-     participant Xport as HCI Transport (drivers/bluetooth/hci)
-     participant Ctlr as Controller (subsys/bluetooth/controller)
+     participant Xport as HCI Transport (drivers/bluetooth/hci OR controller/hci/hci_driver.c)
+     participant Ctlr as Controller (controller/hci/hci.c)
+     participant LL  (optional, if showing entry into LL territory to mark Phase 2 boundary — recommended)
 4. Show two flows in one diagram:
      - Top half: HCI_LE_Set_Advertising_Enable command,
        App → Host → Xport → Ctlr → ACK back as Command Complete.

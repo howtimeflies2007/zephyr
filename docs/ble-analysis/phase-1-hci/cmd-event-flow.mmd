@@ -4,6 +4,8 @@
 %% Shows outbound command path HOST->CTLR, LL entry, and CMD_COMPLETE return CTLR->HOST.
 
 sequenceDiagram
+%% Five participants used (vs four in spec): LL is broken out to mark
+%% the Phase 2 boundary. Phase 4 GAP diagrams reuse this convention.
     participant APP
     participant HOST
     participant XPORT as HCI-XPORT
