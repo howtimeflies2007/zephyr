@@ -6,7 +6,7 @@ Revision: c2dc4ea037a6c1c0dce37d44949b066face27bea
 
 ## Overview
 
-Zephyr selects an HCI transport driver at build time through the `zephyr,bt-hci` devicetree chosen node: the application DTS names a node whose `compatible` property binds it to a specific driver. Each driver implements the `bt_hci` device API (`struct bt_hci_driver_api` — fields `open`, `send`, `close`, and optional `setup`) and registers itself via `DEVICE_DT_INST_DEFINE`. The host calls `bt_hci_open(bt_dev.hci, bt_hci_recv)` once at `bt_enable()` time; after that, the driver pushes received frames up by calling the `recv` callback it was given. In combined build mode (host + controller in one image), the transport layer is the in-tree software controller registered in `subsys/bluetooth/controller/hci/hci_driver.c` — the physical transport drivers in `drivers/bluetooth/hci/` are not in the call path at all.
+Zephyr selects an HCI transport driver at build time through the `zephyr,bt-hci` devicetree chosen node: the application DTS names a node whose `compatible` property binds it to a specific driver. Each driver implements the `bt_hci` device API (`struct bt_hci_driver_api` — fields `open`, `send`, `close`, and optional `setup`) and registers itself via `DEVICE_DT_INST_DEFINE`. The host calls `bt_hci_open(bt_dev.hci, bt_hci_recv)` once at `bt_enable()` time; after that, the driver pushes received frames up by calling the `recv` callback it was given. In combined build mode (host + controller in one image), the transport layer is the in-tree software controller registered in `subsys/bluetooth/controller/hci/hci_driver.c` — the physical transport drivers in `drivers/bluetooth/hci/` are not in the call path at all. The directory contains 26 `.c` files in total: 20 are standalone `bt_hci` drivers (each registering via `DEVICE_DT_INST_DEFINE`), and 6 are helper or support files compiled alongside their primary driver without their own device registration.
 
 ---
 
@@ -24,18 +24,22 @@ Zephyr selects an HCI transport driver at build time through the `zephyr,bt-hci`
 
 ### Additional vendor-specific drivers (not in primary analysis scope)
 
-| Driver | Kconfig | DT compatible | Source file | send() | Registration |
-|---|---|---|---|---|---|
-| STM32WB IPM | `CONFIG_BT_STM32_IPM` (drivers/bluetooth/hci/Kconfig:120) | `st,stm32wb-rf` | `ipm_stm32wb.c` | `bt_ipm_send` (line 702) | `DEVICE_DT_INST_DEFINE` (line 723) |
-| STM32WBA | `CONFIG_BT_STM32WBA` (drivers/bluetooth/hci/Kconfig:130) | `st,hci-stm32wba` | `hci_stm32wba.c` | `bt_hci_stm32wba_send` (line 622) | `DEVICE_DT_INST_DEFINE` (line 629) |
-| STM32WB0 | `CONFIG_BT_STM32WB0` (drivers/bluetooth/hci/Kconfig:140) | `st,hci-stm32wb0` | `hci_stm32wb0.c` | `bt_hci_stm32wb0_send` (line 574) | `DEVICE_DT_INST_DEFINE` (line 581) |
-| ESP32 | `CONFIG_BT_ESP32` (drivers/bluetooth/hci/Kconfig:167) | `espressif,esp32-bt-hci` | `hci_esp32.c` | `bt_esp32_send` (line 860) | `DEVICE_DT_INST_DEFINE` (line 866) |
-| NXP (UART/H4) | `CONFIG_BT_NXP` (drivers/bluetooth/hci/Kconfig:213) | `nxp,hci-ble` | `hci_nxp.c` | `bt_nxp_send` (line 637) | `DEVICE_DT_INST_DEFINE` (line 661) |
-| Infineon CYW208XX | `CONFIG_BT_CYW208XX` (drivers/bluetooth/hci/Kconfig:223) | `infineon,cyw208xx-hci` | `hci_infineon_cyw208xx.c` | `cyw208xx_send` (line 375) | `DEVICE_DT_INST_DEFINE` (line 551) |
-| Ambiq Apollo SPI | `CONFIG_BT_AMBIQ_HCI` (drivers/bluetooth/hci/Kconfig:230) | `ambiq,bt-hci-spi` | `hci_ambiq.c` | `bt_apollo_send` (line 419) | `DEVICE_DT_INST_DEFINE` (line 446) |
-| Renesas DA1469x | `CONFIG_BT_DA1469X` (drivers/bluetooth/hci/Kconfig:205) | `renesas,bt-hci-da1469x` | `hci_da1469x.c` | `bt_da1469x_send` (line 481) | `DEVICE_DT_INST_DEFINE` (line 501) |
-| Realtek Bee | n/a (DT-gated) | `realtek,bee-bt-hci` | `hci_bee.c` | `bt_hci_bee_send` (line 292) | `DEVICE_DT_INST_DEFINE` (line 298) |
-| SiFli SF32LB | `CONFIG_BT_SF32LB` (drivers/bluetooth/hci/Kconfig:373) | `sifli,sf32lb-mailbox` | `hci_sf32lb.c` | (IPC mailbox) | (IPC mailbox) |
+| Driver | Kconfig | DT compatible | Framing | Source file | send() | Registration | Quirks |
+|---|---|---|---|---|---|---|---|
+| STM32WB IPM | `CONFIG_BT_STM32_IPM` (drivers/bluetooth/hci/Kconfig:120) | `st,stm32wb-rf` | — | `ipm_stm32wb.c` | `bt_ipm_send` (line 702) | `DEVICE_DT_INST_DEFINE` (line 723) | — |
+| STM32WBA | `CONFIG_BT_STM32WBA` (drivers/bluetooth/hci/Kconfig:130) | `st,hci-stm32wba` | — | `hci_stm32wba.c` | `bt_hci_stm32wba_send` (line 622) | `DEVICE_DT_INST_DEFINE` (line 629) | — |
+| STM32WB0 | `CONFIG_BT_STM32WB0` (drivers/bluetooth/hci/Kconfig:140) | `st,hci-stm32wb0` | — | `hci_stm32wb0.c` | `bt_hci_stm32wb0_send` (line 574) | `DEVICE_DT_INST_DEFINE` (line 581) | — |
+| ESP32 | `CONFIG_BT_ESP32` (drivers/bluetooth/hci/Kconfig:167) | `espressif,esp32-bt-hci` | — | `hci_esp32.c` | `bt_esp32_send` (line 860) | `DEVICE_DT_INST_DEFINE` (line 866) | — |
+| NXP (UART/H4) | `CONFIG_BT_NXP` (drivers/bluetooth/hci/Kconfig:213) | `nxp,hci-ble` | — | `hci_nxp.c` | `bt_nxp_send` (line 637) | `DEVICE_DT_INST_DEFINE` (line 661) | — |
+| Infineon CYW208XX | `CONFIG_BT_CYW208XX` (drivers/bluetooth/hci/Kconfig:223) | `infineon,cyw208xx-hci` | — | `hci_infineon_cyw208xx.c` | `cyw208xx_send` (line 375) | `DEVICE_DT_INST_DEFINE` (line 551) | — |
+| Ambiq Apollo SPI | `CONFIG_BT_AMBIQ_HCI` (drivers/bluetooth/hci/Kconfig:230) | `ambiq,bt-hci-spi` | — | `hci_ambiq.c` | `bt_apollo_send` (line 419) | `DEVICE_DT_INST_DEFINE` (line 446) | — |
+| Renesas DA1469x | `CONFIG_BT_DA1469X` (drivers/bluetooth/hci/Kconfig:205) | `renesas,bt-hci-da1469x` | — | `hci_da1469x.c` | `bt_da1469x_send` (line 481) | `DEVICE_DT_INST_DEFINE` (line 501) | — |
+| Realtek Bee | n/a (DT-gated) | `realtek,bee-bt-hci` | — | `hci_bee.c` | `bt_hci_bee_send` (line 292) | `DEVICE_DT_INST_DEFINE` (line 298) | — |
+| SiFli SF32LB | `CONFIG_BT_SF32LB` (drivers/bluetooth/hci/Kconfig:373) | `sifli,sf32lb-mailbox` | — | `hci_sf32lb.c` | (IPC mailbox) | (IPC mailbox) | — |
+| Silicon Labs EFR32 | `CONFIG_BT_SILABS_EFR32` (drivers/bluetooth/hci/Kconfig.silabs:19) | `silabs,bt-hci-efr32` | In-process HCI via SiSDK binary blob; `hci_common_transport_receive` carries H4-prefixed packet to blob, `hci_common_transport_transmit` delivers events/ACL back; no wire framing | `drivers/bluetooth/hci/hci_silabs_efr32.c` | `slz_bt_send` (drivers/bluetooth/hci/hci_silabs_efr32.c:180) | `DEVICE_DT_INST_DEFINE` (drivers/bluetooth/hci/hci_silabs_efr32.c:351) | LL thread must run at meta-IRQ priority (`CONFIG_NUM_METAIRQ_PRIORITIES > 0`); integrates SiSDK RAIL-based controller; `select HAS_BT_CTLR` |
+| Silicon Labs SiWx91x | `CONFIG_BT_SILABS_SIWX91X` (drivers/bluetooth/hci/Kconfig.silabs:5) | `silabs,siwx91x-bt-hci` | Raw HCI bytes via WiseConnect RSI `rsi_bt_driver_send_cmd(RSI_BLE_REQ_HCI_RAW, ...)`; RX via RSI `siwx91x_bt_resp_rcvd` callback; no wire framing | `drivers/bluetooth/hci/hci_silabs_siwx91x.c` | `siwx91x_bt_send` (drivers/bluetooth/hci/hci_silabs_siwx91x.c:98) | `DEVICE_DT_INST_DEFINE` (drivers/bluetooth/hci/hci_silabs_siwx91x.c:184) | Wi-Fi+BLE combo (SiWx917); HCI ACL flow control disabled by default; `setup()` sends RF power VS command |
+| Bouffalo Lab BL70x | `CONFIG_BT_BFLB_BL70X` (drivers/bluetooth/hci/Kconfig.bflb:4) | `bflb,bl70x-bt-hci` | H4 type byte extracted from `net_buf` and converted to vendor `hci_pkt_struct` for `bt_onchiphci_send`; RX via `bt_onchiphci_interface_init` callback queued through `K_MSGQ` | `drivers/bluetooth/hci/hci_bflb_bl70x.c` | `bt_bflb_send` (drivers/bluetooth/hci/hci_bflb_bl70x.c:209) | `DEVICE_DT_INST_DEFINE` (drivers/bluetooth/hci/hci_bflb_bl70x.c:353) | Precompiled controller blob; multiple BLE role variants selected by Kconfig choice; BT MAC read from eFuse at open |
+| Infineon PSoC 6 BLESS | `CONFIG_BT_PSOC6_BLESS` (drivers/bluetooth/hci/Kconfig:186) | `infineon,bless-hci` | Soft-HCI via PSoC 6 BLESS stack: H4 type byte extracted in `psoc6_bless_send`, packet passed via `Cy_BLE_SoftHciSendAppPkt`; events received via BLESS interrupt callback | `drivers/bluetooth/hci/hci_infineon_psoc6_bless.c` | `psoc6_bless_send` (drivers/bluetooth/hci/hci_infineon_psoc6_bless.c:160) | `DEVICE_DT_INST_DEFINE` (drivers/bluetooth/hci/hci_infineon_psoc6_bless.c:262) | `setup()` reads public BD_ADDR from SFLASH and programs it via VS opcode 0x1a0; semaphore serializes BLE operations |
 
 ---
 
@@ -52,6 +56,8 @@ The `send()` path (h4_send, h4.c:485) enqueues the `net_buf` to `h4->tx.fifo` an
 Kconfig dependency: `DT_HAS_ZEPHYR_BT_HCI_UART_ENABLED` — the driver is only compiled when the DTS contains a `zephyr,bt-hci-uart` node with `status = "okay"`.
 
 `hci_da1453x.c` (59 lines) is a thin vendor extension: it overrides the weak `bt_hci_transport_setup()` hook that `h4_open` calls, adding GPIO reset sequencing for Renesas DA1453x-based modules. The actual HCI driver remains `h4.c`.
+
+`hci_uart_infineon.c` (385 lines) is the H4 setup extension for Infineon/Broadcom AIROC controllers (CYW208xx, CYW555xx series). It implements `bt_h4_vnd_setup()` — the hook invoked by `h4_open` when `CONFIG_BT_HCI_SETUP=y` — handling optional REG_ON GPIO power-on sequencing, firmware patch download in `.hcd` format via VS write/launch-RAM commands, UART baud rate negotiation (standard and auto-baud modes for CYW555xx Download mode), and optional public BD_ADDR programming via a vendor command. The actual HCI driver remains `h4.c`.
 
 ### H5 UART (`h5.c`)
 
@@ -84,6 +90,10 @@ The `BT_DRIVER_QUIRK_NO_AUTO_DLE` quirk (drivers/bluetooth/hci/Kconfig:281) defa
 The user channel is a Linux kernel mechanism that allows a userspace process to open an `AF_BLUETOOTH` socket with `BTPROTO_HCI` in `HCI_CHANNEL_USER` mode, bypassing BlueZ and taking exclusive control of a real HCI adapter. Zephyr's `native_sim` board uses this to run the full Zephyr BLE stack on top of a Linux host adapter — useful for protocol testing without physical hardware.
 
 Kconfig constraint: `depends on BOARD_NATIVE_SIM` (line 156). The adapter must be administratively down before Zephyr takes over. The driver registers `userchan_bottom.c` helpers for the low-level socket I/O.
+
+### Ambiq SPI helper (`apollox_blue.c`)
+
+`apollox_blue.c` (466 lines) is a SoC-level helper for `hci_ambiq.c` (the Ambiq Apollo SPI driver). It provides three capabilities to that driver: (1) `bt_apollo_spi_send` and `bt_apollo_spi_rcv` — SPI transaction helpers used on the send and receive paths; (2) an override of the `bt_hci_transport_setup` weak hook from `h4.c`, which configures RST, IRQ, and CLKREQ GPIOs and enables XO32MHz/XO32kHz oscillators; (3) `bt_apollo_controller_init` / `bt_apollo_controller_deinit` — Cooper chip bring-up and teardown. All three APIs have dual implementations selected by `CONFIG_SOC_SERIES_APOLLO4X` vs. `CONFIG_SOC_SERIES_APOLLO3X` guards. The file has no `DEVICE_DT_INST_DEFINE` of its own.
 
 ---
 
